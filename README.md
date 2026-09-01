@@ -1,0 +1,111 @@
+# umbriel-raise
+
+A small, dependency-free utility that focuses an existing application window
+in [Umbriel](https://github.com/noctalia-dev/umbriel), or launches the
+application when no matching window exists.
+
+It uses Umbriel's own CLI for window discovery, focusing, and activation-aware
+launching. When several windows have the same app ID, repeated invocations
+cycle through them.
+
+## Features
+
+- Exact, case-sensitive `app_id` matching
+- Deterministic cycling through multiple matching windows
+- One retry when a window disappears between discovery and focus
+- Launches through `umbriel msg spawn` to receive an activation token
+- No runtime dependencies beyond Umbriel
+
+## Installation
+
+### Release binary
+
+Download the binary for your architecture from the
+[latest release](https://github.com/rigerc/umbriel-raise/releases/latest), then
+install it somewhere on your `PATH`:
+
+```bash
+install -Dm755 umbriel-raise-linux-amd64 ~/.local/bin/umbriel-raise
+```
+
+Use `umbriel-raise-linux-arm64` instead on ARM64 systems.
+
+### Go
+
+With a recent Go toolchain installed:
+
+```bash
+go install github.com/rigerc/umbriel-raise@latest
+```
+
+## Usage
+
+```text
+umbriel-raise --app-id APP_ID -- COMMAND [ARG...]
+```
+
+Find an application's ID with:
+
+```bash
+umbriel windows --json
+```
+
+Then configure an application:
+
+```bash
+umbriel-raise --app-id zen -- zen-browser
+umbriel-raise --app-id com.mitchellh.ghostty -- ghostty
+```
+
+Use `--umbriel PATH` if the Umbriel CLI is not available as `umbriel` on your
+`PATH`.
+
+### Umbriel keybinds
+
+Set `repeat = false` so holding a key does not trigger multiple activations:
+
+```toml
+[keybinds]
+"Mod+B" = {
+  action = "spawn:umbriel-raise --app-id zen -- zen-browser",
+  repeat = false
+}
+
+"Mod+Return" = {
+  action = "spawn:umbriel-raise --app-id com.mitchellh.ghostty -- ghostty",
+  repeat = false
+}
+```
+
+Validate the configuration after editing it:
+
+```bash
+umbriel validate
+```
+
+## Behavior
+
+| Matching windows | Result |
+| --- | --- |
+| None | Launch the supplied command through Umbriel |
+| One | Focus that window |
+| Several, none focused | Focus the first match returned by Umbriel |
+| Several, one focused | Focus the next match, wrapping at the end |
+
+Matching uses the `app_id` field from `umbriel windows --json`; substrings and
+regular expressions are not accepted.
+
+The command exits with status `0` on success, `1` when an Umbriel operation
+fails, and `2` for invalid command-line usage.
+
+## Development
+
+```bash
+go test -race ./...
+go vet ./...
+go build ./...
+```
+
+Umbriel's [IPC documentation](https://docs.noctalia.dev/umbriel/ipc/) and
+[action reference](https://docs.noctalia.dev/umbriel/actions/) describe the
+commands used by this utility.
