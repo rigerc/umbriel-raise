@@ -16,6 +16,7 @@ import (
 )
 
 const usageText = `Usage: umbriel-raise --app-id APP_ID [--umbriel PATH] -- COMMAND [ARG...]
+       umbriel-raise setup [OPTIONS]
 
 Focus an existing Umbriel window, or launch the command when none exists.
 
@@ -32,12 +33,15 @@ type options struct {
 	command     []string
 }
 
+type setupExecutor func(context.Context, []string, io.Reader, io.Writer, io.Writer) int
+
 type window struct {
-	ID      string `json:"id"`
-	AppID   string `json:"app_id"`
-	Title   string `json:"title"`
-	Active  bool   `json:"active"`
-	Focused bool   `json:"focused"`
+	ID        string `json:"id"`
+	AppID     string `json:"app_id"`
+	Title     string `json:"title"`
+	Workspace string `json:"workspace"`
+	Active    bool   `json:"active"`
+	Focused   bool   `json:"focused"`
 }
 
 type runner interface {
@@ -196,7 +200,7 @@ func activate(ctx context.Context, r runner, appID string, command []string) err
 	return nil
 }
 
-func execute(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func executeLegacy(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	var flagOutput bytes.Buffer
 	opts, err := parseOptions(args, &flagOutput)
 	if err != nil {
@@ -218,6 +222,25 @@ func execute(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
+}
+
+func executeWithSetup(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+	setup setupExecutor,
+) int {
+	if len(args) > 0 && args[0] == "setup" {
+		return setup(ctx, args[1:], stdin, stdout, stderr)
+	}
+
+	return executeLegacy(ctx, args, stdout, stderr)
+}
+
+func execute(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	return executeWithSetup(ctx, args, os.Stdin, stdout, stderr, runSetupCLI)
 }
 
 func main() {

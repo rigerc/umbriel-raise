@@ -39,3 +39,46 @@ completed_evidence: [focused RED-GREEN tests, race suite, vet, build, live focus
 ## Next Workflow
 
 deploy-release
+
+---
+
+# Walkthrough: Guided Rule Setup
+
+## Scope
+
+Add `umbriel-raise setup` for interactive app-ID discovery and validated
+keybind generation without editing the active Umbriel config.
+
+## Acceptance Evidence
+
+| Requirement | Result | Evidence |
+| --- | --- | --- |
+| REQ-001 legacy-safe routing | PASS | `TestExecuteRoutesSetup` plus the full existing activation suite |
+| REQ-002 discovery/grouping | PASS | `TestDiscoverAppsGroupsAndSortsWindows`; live Ghostty/T3 Code/Zen list |
+| REQ-003 guided inputs | PASS | discovered, refresh/manual, and accessible Huh flow tests |
+| REQ-004 safe generation | PASS | special-character generation test and live keybind preview |
+| REQ-005 validation | PASS | temp-config boundary tests and installed `umbriel validate -c` |
+| REQ-006 absolute path | PASS | generated live action used the resolved test binary path |
+| REQ-007 accessible/safe display | PASS | no-color end-to-end test and hostile control-character fixture |
+| REQ-008 safe output | PASS | exclusive-create and explicit-force overwrite tests |
+
+## Quality Gates
+
+- `go test -count=1 -race ./...`: PASS.
+- `go vet ./...`: PASS.
+- `go build ./...`: PASS.
+- `gopls check` for all Go files: PASS.
+- `git diff --check`: PASS.
+- Statement coverage: 79.0%; uncovered code is primarily full-screen terminal
+  rendering and OS-level error branches, while the pure and external-boundary
+  setup contracts have direct coverage.
+
+## Outcome Report
+
+feature_status: implemented
+requirement_trace: BRD guided-setup objective -> REQ-001..REQ-008 -> AC-001..AC-010 -> routing/discovery/generation/interaction tests and live validation
+completed_evidence: [focused RED-GREEN slices, accessible CLI E2E, race suite, vet, build, gopls, live Umbriel validation]; missing_evidence: []; decision_needed: []; recommended_next_workflow: verify-work
+
+## Next Workflow
+
+verify-work

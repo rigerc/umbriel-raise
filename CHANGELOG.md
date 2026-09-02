@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0] - 2026-09-02
+
+### Added
+
+- Add `umbriel-raise setup`, an interactive terminal wizard that discovers
+  running app IDs and generates a validated Umbriel keybind.
+- Add accessible and no-color prompts plus safe optional snippet output with
+  explicit overwrite protection.
+
 ## [0.1.1] - 2026-09-02
 
 ### Fixed

@@ -43,3 +43,9 @@ adding runtime dependencies.
 ## Next Workflow
 
 verify-work
+
+## Guided Setup Wizard
+
+The additive setup-wizard implementation is tracked separately in
+`docs/srs/srs-task-list-setup-wizard.md` so the v0.1.1 bug-fix evidence above
+remains intact. All setup-wizard slices and verification gates are complete.

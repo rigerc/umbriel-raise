@@ -3,11 +3,41 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestExecuteRoutesSetup(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+	called := false
+
+	setup := func(_ context.Context, args []string, stdin io.Reader, gotStdout, gotStderr io.Writer) int {
+		called = true
+		if !reflect.DeepEqual(args, []string{"--accessible", "--umbriel", "/opt/umbriel"}) {
+			t.Fatalf("setup args = %v", args)
+		}
+		if stdin == nil || gotStdout != &stdout || gotStderr != &stderr {
+			t.Fatal("setup streams were not preserved")
+		}
+		return 7
+	}
+
+	code := executeWithSetup(
+		context.Background(),
+		[]string{"setup", "--accessible", "--umbriel", "/opt/umbriel"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		setup,
+	)
+	if code != 7 || !called {
+		t.Fatalf("executeWithSetup() = %d, called = %v", code, called)
+	}
+}
 
 type response struct {
 	output string
