@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -65,22 +66,25 @@ func TestSelectWindow(t *testing.T) {
 		{name: "empty", found: false},
 		{name: "one", matches: []window{{ID: "one"}}, wantID: "one", found: true},
 		{
-			name:    "first when none focused",
+			name:    "most recent when another app is active",
 			matches: []window{{ID: "one"}, {ID: "two"}},
 			wantID:  "one",
 			found:   true,
 		},
 		{
-			name:    "next after focused",
-			matches: []window{{ID: "one", Focused: true}, {ID: "two"}, {ID: "three"}},
-			wantID:  "two",
+			name:    "least recent when a match is active",
+			matches: []window{{ID: "one", Active: true}, {ID: "two"}, {ID: "three"}},
+			wantID:  "three",
 			found:   true,
 		},
 		{
-			name:    "wrap after last focused",
-			matches: []window{{ID: "one"}, {ID: "two", Focused: true}},
-			wantID:  "one",
-			found:   true,
+			name: "workspace local focus does not define active selection",
+			matches: []window{
+				{ID: "one", Focused: true},
+				{ID: "two", Focused: true},
+			},
+			wantID: "one",
+			found:  true,
 		},
 	}
 
@@ -99,7 +103,7 @@ func TestActivateSpawnsWhenNoWindowMatches(t *testing.T) {
 		t: t,
 		want: [][]string{
 			{"windows", "--json"},
-			{"msg", "spawn", "zen-browser", "--private-window"},
+			{"msg", "spawn", `'zen-browser' '--private-window'`},
 		},
 		replies: []response{
 			{output: `[{"id":"terminal","app_id":"com.mitchellh.ghostty","focused":true}]`},
@@ -119,7 +123,7 @@ func TestActivateFocusesOnlyMatchingWindow(t *testing.T) {
 		t: t,
 		want: [][]string{
 			{"windows", "--json"},
-			{"msg", "window-focus:browser"},
+			{"msg", "window-focus-warp:browser"},
 		},
 		replies: []response{
 			{output: `[{"id":"browser","app_id":"zen","focused":false}]`},
@@ -139,11 +143,11 @@ func TestActivateCyclesMatchingWindows(t *testing.T) {
 		t: t,
 		want: [][]string{
 			{"windows", "--json"},
-			{"msg", "window-focus:second"},
+			{"msg", "window-focus-warp:second"},
 		},
 		replies: []response{
 			{output: `[
-				{"id":"first","app_id":"zen","focused":true},
+				{"id":"first","app_id":"zen","active":true,"focused":true},
 				{"id":"terminal","app_id":"com.mitchellh.ghostty","focused":false},
 				{"id":"second","app_id":"zen","focused":false}
 			]`},
@@ -163,9 +167,9 @@ func TestActivateRefreshesAfterStaleWindowID(t *testing.T) {
 		t: t,
 		want: [][]string{
 			{"windows", "--json"},
-			{"msg", "window-focus:stale"},
+			{"msg", "window-focus-warp:stale"},
 			{"windows", "--json"},
-			{"msg", "window-focus:replacement"},
+			{"msg", "window-focus-warp:replacement"},
 		},
 		replies: []response{
 			{output: `[{"id":"stale","app_id":"zen"}]`},
@@ -187,9 +191,9 @@ func TestActivateSpawnsWhenWindowDisappears(t *testing.T) {
 		t: t,
 		want: [][]string{
 			{"windows", "--json"},
-			{"msg", "window-focus:stale"},
+			{"msg", "window-focus-warp:stale"},
 			{"windows", "--json"},
-			{"msg", "spawn", "zen-browser"},
+			{"msg", "spawn", `'zen-browser'`},
 		},
 		replies: []response{
 			{output: `[{"id":"stale","app_id":"zen"}]`},
@@ -218,6 +222,28 @@ func TestActivateRejectsMalformedWindowJSON(t *testing.T) {
 		t.Fatalf("activate() error = %v, want decode failure", err)
 	}
 	runner.verify(t)
+}
+
+func TestFormatShellCommandPreservesArguments(t *testing.T) {
+	command := []string{
+		"printf",
+		"<%s>\n",
+		"",
+		"scratch pad",
+		"it's literal",
+		"$HOME; echo changed",
+		"line\nbreak",
+	}
+
+	output, err := exec.Command("/bin/sh", "-c", formatShellCommand(command)).Output()
+	if err != nil {
+		t.Fatalf("execute formatted command: %v", err)
+	}
+
+	want := "<>\n<scratch pad>\n<it's literal>\n<$HOME; echo changed>\n<line\nbreak>\n"
+	if got := string(output); got != want {
+		t.Fatalf("formatted command output = %q, want %q", got, want)
+	}
 }
 
 func TestParseOptions(t *testing.T) {

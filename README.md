@@ -4,16 +4,18 @@ A small, dependency-free utility that focuses an existing application window
 in [Umbriel](https://github.com/noctalia-dev/umbriel), or launches the
 application when no matching window exists.
 
-It uses Umbriel's own CLI for window discovery, focusing, and activation-aware
-launching. When several windows have the same app ID, repeated invocations
-cycle through them.
+It uses Umbriel's own CLI for window discovery, cursor-warping focus, and
+activation-aware launching. When several windows have the same app ID,
+repeated invocations rotate through Umbriel's focus history.
 
 ## Features
 
 - Exact, case-sensitive `app_id` matching
-- Deterministic cycling through multiple matching windows
+- Focuses and warps the cursor with Umbriel's runtime-switcher action
+- MRU-aware rotation through multiple matching windows
 - One retry when a window disappears between discovery and focus
 - Launches through `umbriel msg spawn` to receive an activation token
+- Preserves literal command arguments across Umbriel's shell boundary
 - No runtime dependencies beyond Umbriel
 
 ## Installation
@@ -88,12 +90,15 @@ umbriel validate
 | Matching windows | Result |
 | --- | --- |
 | None | Launch the supplied command through Umbriel |
-| One | Focus that window |
-| Several, none focused | Focus the first match returned by Umbriel |
-| Several, one focused | Focus the next match, wrapping at the end |
+| One | Focus that window and warp the cursor to it |
+| Several, another app active | Focus the most recently focused match |
+| Several, a match active | Focus the least recently focused match, rotating through all matches |
 
 Matching uses the `app_id` field from `umbriel windows --json`; substrings and
-regular expressions are not accepted.
+regular expressions are not accepted. Umbriel returns windows in
+most-recently-focused order, so rotation requires no state file. Launch command
+arguments are treated literally, including whitespace and shell
+metacharacters.
 
 The command exits with status `0` on success, `1` when an Umbriel operation
 fails, and `2` for invalid command-line usage.
