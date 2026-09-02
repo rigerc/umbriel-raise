@@ -1,6 +1,6 @@
 # umbriel-raise
 
-A small, dependency-free utility that focuses an existing application window
+A small utility that focuses an existing application window
 in [Umbriel](https://github.com/noctalia-dev/umbriel), or launches the
 application when no matching window exists.
 
@@ -16,6 +16,7 @@ repeated invocations rotate through Umbriel's focus history.
 - One retry when a window disappears between discovery and focus
 - Launches through `umbriel msg spawn` to receive an activation token
 - Preserves literal command arguments across Umbriel's shell boundary
+- Interactive setup wizard for discovering app IDs and generating keybinds
 - No runtime dependencies beyond Umbriel
 
 ## Installation
@@ -44,7 +45,42 @@ go install github.com/rigerc/umbriel-raise@latest
 
 ```text
 umbriel-raise --app-id APP_ID -- COMMAND [ARG...]
+umbriel-raise setup [OPTIONS]
 ```
+
+### Guided setup
+
+Run the terminal wizard while the application you want to configure is open:
+
+```bash
+umbriel-raise setup
+```
+
+The wizard groups running windows by exact `app_id`, lets you refresh or enter
+an ID manually, and asks for the launch command and Umbriel key chord. It then
+validates a temporary keybind config and prints both the standalone command and
+a copyable TOML snippet. The active Umbriel config is never edited.
+
+Generated actions use the absolute path of the running `umbriel-raise` binary,
+which avoids compositor sessions with a narrower `PATH` than the login shell.
+Use plain, line-oriented prompts when needed:
+
+```bash
+umbriel-raise setup --accessible
+umbriel-raise setup --no-color
+```
+
+To save only the validated TOML keybind snippet, use `--output`. Existing files
+are preserved unless `--force` is explicit:
+
+```bash
+umbriel-raise setup --output ~/.config/umbriel/raise-keybind.toml
+umbriel-raise setup --output ./raise-keybind.toml --force
+```
+
+Use `--umbriel PATH` when the Umbriel CLI is not on the wizard's `PATH`.
+
+### Manual setup
 
 Find an application's ID with:
 
@@ -101,7 +137,8 @@ arguments are treated literally, including whitespace and shell
 metacharacters.
 
 The command exits with status `0` on success, `1` when an Umbriel operation
-fails, and `2` for invalid command-line usage.
+fails, and `2` for invalid command-line usage. The setup wizard exits with
+status `130` when canceled.
 
 ## Development
 
