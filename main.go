@@ -19,8 +19,9 @@ const usageText = `Usage: umbriel-raise --app-id APP_ID [--umbriel PATH] -- COMM
 
 Focus an existing Umbriel window, or launch the command when none exists.
 
-When several windows have the same app ID, repeated invocations cycle through
-them in the order returned by Umbriel. Matching is exact and case-sensitive.
+When several windows have the same app ID, repeated invocations rotate through
+Umbriel's focus history. Focusing also warps the cursor to the selected window.
+Matching is exact and case-sensitive.
 
 Options:
 `
@@ -35,6 +36,7 @@ type window struct {
 	ID      string `json:"id"`
 	AppID   string `json:"app_id"`
 	Title   string `json:"title"`
+	Active  bool   `json:"active"`
 	Focused bool   `json:"focused"`
 }
 
@@ -69,6 +71,14 @@ func formatCommand(path string, args []string) string {
 	parts = append(parts, path)
 	for _, arg := range args {
 		parts = append(parts, fmt.Sprintf("%q", arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatShellCommand(command []string) string {
+	parts := make([]string, len(command))
+	for index, arg := range command {
+		parts[index] = "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
 	}
 	return strings.Join(parts, " ")
 }
@@ -128,9 +138,9 @@ func selectWindow(matches []window) (window, bool) {
 		return window{}, false
 	}
 
-	for index, candidate := range matches {
-		if candidate.Focused {
-			return matches[(index+1)%len(matches)], true
+	for _, candidate := range matches {
+		if candidate.Active {
+			return matches[len(matches)-1], true
 		}
 	}
 
@@ -138,17 +148,14 @@ func selectWindow(matches []window) (window, bool) {
 }
 
 func focusWindow(ctx context.Context, r runner, id string) error {
-	if _, err := r.Run(ctx, "msg", "window-focus:"+id); err != nil {
+	if _, err := r.Run(ctx, "msg", "window-focus-warp:"+id); err != nil {
 		return fmt.Errorf("focus window %q: %w", id, err)
 	}
 	return nil
 }
 
 func spawn(ctx context.Context, r runner, command []string) error {
-	args := make([]string, 0, len(command)+2)
-	args = append(args, "msg", "spawn")
-	args = append(args, command...)
-	if _, err := r.Run(ctx, args...); err != nil {
+	if _, err := r.Run(ctx, "msg", "spawn", formatShellCommand(command)); err != nil {
 		return fmt.Errorf("launch command: %w", err)
 	}
 	return nil
