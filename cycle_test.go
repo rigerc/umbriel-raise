@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -287,4 +289,88 @@ func TestExecuteCycleReportsUsageErrors(t *testing.T) {
 	if !strings.Contains(stderr.String(), `unexpected argument "extra"`) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
+}
+
+// fakeUmbriel writes an executable stub that answers every invocation with the
+// given stdout, standing in for the Umbriel CLI so the command layer can be
+// exercised without a compositor.
+func fakeUmbriel(t *testing.T, output string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "umbriel")
+	script := "#!/bin/sh\ncat <<'FIXTURE'\n" + output + "\nFIXTURE\n"
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatalf("write fake umbriel: %v", err)
+	}
+	return path
+}
+
+func TestRunCycleCLISucceedsWhenThereIsNothingToRotate(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	code := runCycleCLI(
+		context.Background(),
+		[]string{"--umbriel", fakeUmbriel(t, `[{"id":"one","app_id":"kitty","active":true}]`)},
+		&stdout,
+		&stderr,
+	)
+	if code != 0 {
+		t.Fatalf("runCycleCLI() = %d, want 0", code)
+	}
+	if stdout.Len() != 0 || stderr.Len() != 0 {
+		t.Fatalf("stdout = %q, stderr = %q, want both empty", stdout.String(), stderr.String())
+	}
+}
+
+func TestRunCycleCLIReportsUmbrielFailures(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	code := runCycleCLI(context.Background(), []string{"--umbriel", missing}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runCycleCLI() = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "umbriel-raise cycle: list windows") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestExecuteCycleReportsUnknownFlags(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	code := execute(context.Background(), []string{"cycle", "--bogus"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("execute() = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "flag provided but not defined") {
+		t.Fatalf("stderr = %q, want the flag package diagnostic forwarded", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "Usage: umbriel-raise cycle") {
+		t.Fatalf("stderr = %q, want usage text", stderr.String())
+	}
+}
+
+func TestCycleFocusedReportsRefreshFailure(t *testing.T) {
+	runner := &fakeRunner{
+		t: t,
+		want: [][]string{
+			{"windows", "--json"},
+			{"msg", "window-focus-warp:second"},
+			{"windows", "--json"},
+		},
+		replies: []response{
+			{output: `[{"id":"first","app_id":"kitty","active":true},{"id":"second","app_id":"kitty"}]`},
+			{err: errors.New("unknown window")},
+			{err: errors.New("ipc closed")},
+		},
+	}
+
+	err := cycleFocused(context.Background(), runner)
+	if err == nil || !strings.Contains(err.Error(), "refresh after focus failure") {
+		t.Fatalf("cycleFocused() error = %v, want refresh failure", err)
+	}
+	runner.verify(t)
 }

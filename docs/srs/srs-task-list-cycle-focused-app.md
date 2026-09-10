@@ -34,6 +34,7 @@
 - [x] Cover selection, activation, routing, and surface contracts with tests.
 - [x] Update README, top-level help, and CHANGELOG.
 - [x] Record verification evidence.
+- [x] Cover the command layer and the shared retry helper to 100%.
 
 ## Test Intent Records
 
@@ -45,6 +46,8 @@
 | Stale window IDs refresh once and never spawn | A closed window fails the keybind, or `cycle` launches an application | Unit, fake runner | `go test -run 'TestCycleFocusedRefreshes|TestCycleFocusedStops' ./...` |
 | Shared retry extraction preserves activation behaviour | Refactoring changes the launch, retry, or error contract of `--app-id` | Unit, existing suite | `go test -run 'TestActivate' ./...` |
 | Surface honours flags, arity, and exit codes | An unexpected argument is silently ignored, or help writes to stderr | Unit, CLI | `go test -run 'TestParseCycleOptions|TestExecuteCycle' ./...` |
+| Command layer maps outcomes to exit codes | A no-op exits non-zero, an Umbriel failure exits `0`, or a flag diagnostic is swallowed | Unit, CLI over a stub Umbriel binary | `go test -run 'TestRunCycleCLI' ./...` |
+| Shared retry surfaces a failed refresh | A second failing window query is reported as success | Unit, fake runner | `go test -run 'TestCycleFocusedReportsRefreshFailure' ./...` |
 
 ## Readiness
 

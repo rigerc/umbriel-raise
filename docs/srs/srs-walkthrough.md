@@ -113,6 +113,11 @@ application currently owns focus, against Umbriel 0.1.0.
 | AC-5 stale retry | PASS | `TestCycleFocusedRefreshesAfterStaleWindowID`, `TestCycleFocusedStopsWhenTargetDisappears`, `TestCycleFocusedReportsFocusFailure` |
 | AC-6 regression suite | PASS | `go test -count=1 -race ./...`, `go vet ./...`, `go build ./...`, `gofmt -l`; live `--app-id emacs` focused an existing window with the window count unchanged |
 
+Statement coverage: every function in `cycle.go` and the extracted
+`focusSelected` helper reach 100%, moving the package from 80.4% to 84.2%. The
+command layer is covered without a compositor by pointing `--umbriel` at a
+stub script for the success path and at a missing path for the failure path.
+
 ## Risks
 
 `activate` and `cycle` now share one `focusSelected` retry helper. The existing
