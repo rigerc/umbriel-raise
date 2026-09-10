@@ -82,3 +82,61 @@ completed_evidence: [focused RED-GREEN slices, accessible CLI E2E, race suite, v
 ## Next Workflow
 
 verify-work
+
+---
+
+# Walkthrough: Cycle Windows of the Focused Application
+
+## Scope
+
+Add `umbriel-raise cycle`, rotating focus through the windows of whichever
+application currently owns focus, against Umbriel 0.1.0.
+
+## Acceptance Criteria
+
+- AC-1: `cycle` routes without disturbing legacy activation or `setup`.
+- AC-2: The focused application comes from global `active`, not workspace-local
+  `focused`.
+- AC-3: No active window, no app ID, or a single window is a silent success.
+- AC-4: Several windows rotate to the least recently focused match.
+- AC-5: A stale window ID refreshes once and never launches an application.
+- AC-6: Existing activation, setup, and CLI behavior remains intact.
+
+## Evidence
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| AC-1 routing | PASS | `TestExecuteRoutesCycle`; existing `TestExecuteRoutesSetup` and legacy usage tests |
+| AC-2 focus scope | PASS | `TestSelectCycleTarget/workspace_local_focus_does_not_select_the_app` |
+| AC-3 quiet no-ops | PASS | `TestSelectCycleTarget` no-active/no-app-ID/single-window cases; `TestCycleFocusedIsQuietWhenFocusedAppHasOneWindow` asserts no focus call is issued; live no-op on a single-window `emacs` |
+| AC-4 rotation | PASS | `TestSelectCycleTarget` two- and three-window cases; `TestCycleFocusedRotatesToLeastRecentMatch`; live rotation across five `kitty` windows reached three distinct windows without repeating |
+| AC-5 stale retry | PASS | `TestCycleFocusedRefreshesAfterStaleWindowID`, `TestCycleFocusedStopsWhenTargetDisappears`, `TestCycleFocusedReportsFocusFailure` |
+| AC-6 regression suite | PASS | `go test -count=1 -race ./...`, `go vet ./...`, `go build ./...`, `gofmt -l`; live `--app-id emacs` focused an existing window with the window count unchanged |
+
+Statement coverage: every function in `cycle.go` and the extracted
+`focusSelected` helper reach 100%, moving the package from 80.4% to 84.2%. The
+command layer is covered without a compositor by pointing `--umbriel` at a
+stub script for the success path and at a missing path for the failure path.
+
+## Risks
+
+`activate` and `cycle` now share one `focusSelected` retry helper. The existing
+activation tests assert exact IPC call sequences for the launch, focus, retry,
+and refresh paths, so they pin the extraction; they pass unchanged.
+
+`selectCycleTarget` defers to `selectWindow`, which returns the last match when
+any match is active. This assumes Umbriel lists the globally active window
+first among its own application's windows, which is the same MRU assumption the
+existing rotation already relies on. If that ordering were violated, `cycle`
+would re-focus the current window and warp the cursor to it rather than
+misbehave. Live rotation across five windows showed the assumption holding.
+
+## Outcome Report
+
+feature_status: implemented
+requirement_trace: focused-app rotation objective -> REQ-001..REQ-007 -> AC-1..AC-6 -> routing/selection/activation/surface contracts -> unit and live evidence
+completed_evidence: [RED-GREEN focused tests, race suite, vet, build, gofmt, live rotation, live no-op, live legacy regression]; missing_evidence: []; decision_needed: []; recommended_next_workflow: deploy-release
+
+## Next Workflow
+
+deploy-release
