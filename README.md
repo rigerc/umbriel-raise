@@ -13,6 +13,7 @@ repeated invocations rotate through Umbriel's focus history.
 - Exact, case-sensitive `app_id` matching
 - Focuses and warps the cursor with Umbriel's runtime-switcher action
 - MRU-aware rotation through multiple matching windows
+- One keybind that cycles the windows of whichever app already has focus
 - One retry when a window disappears between discovery and focus
 - Launches through `umbriel msg spawn` to receive an activation token
 - Preserves literal command arguments across Umbriel's shell boundary
@@ -45,8 +46,26 @@ go install github.com/rigerc/umbriel-raise@latest
 
 ```text
 umbriel-raise --app-id APP_ID -- COMMAND [ARG...]
+umbriel-raise cycle [OPTIONS]
 umbriel-raise setup [OPTIONS]
 ```
+
+### Cycling the focused application
+
+Bind `cycle` to rotate through the windows of whichever application currently
+has focus:
+
+```bash
+umbriel-raise cycle
+```
+
+This is the "next terminal" keybind: focus any terminal, press the chord, and
+focus moves to the next window of that same application. Press it while a
+browser is focused and it cycles browser windows instead. No app ID and no
+launch command are involved, so one chord covers every application.
+
+Nothing happens when no window is focused or the focused application has only
+one window, and `cycle` never launches anything.
 
 ### Guided setup
 
@@ -113,6 +132,8 @@ Set `repeat = false` so holding a key does not trigger multiple activations:
   action = "spawn:umbriel-raise --app-id com.mitchellh.ghostty -- ghostty",
   repeat = false
 }
+
+"Mod+Grave" = { action = "spawn:umbriel-raise cycle", repeat = false }
 ```
 
 Validate the configuration after editing it:
@@ -129,6 +150,18 @@ umbriel validate
 | One | Focus that window and warp the cursor to it |
 | Several, another app active | Focus the most recently focused match |
 | Several, a match active | Focus the least recently focused match, rotating through all matches |
+
+The `cycle` subcommand reads the focused application from the window that
+Umbriel reports as `active`, then applies the same table with launching removed:
+
+| Windows of the focused app | Result |
+| --- | --- |
+| None focused, or no app ID | Do nothing |
+| One | Do nothing; it is already focused |
+| Several | Focus the least recently focused one, rotating through all of them |
+
+Umbriel marks one window per workspace as `focused`, so only the `active` flag
+identifies the window the user is looking at.
 
 Matching uses the `app_id` field from `umbriel windows --json`; substrings and
 regular expressions are not accepted. Umbriel returns windows in

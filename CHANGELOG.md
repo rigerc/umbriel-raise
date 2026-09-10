@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Add `umbriel-raise cycle`, which rotates focus through the windows of
+  whichever application currently owns focus, so a single keybind can switch
+  between terminals, browser windows, or any other multi-window application.
+
 ## [0.2.0] - 2026-09-02
 
 ### Added
