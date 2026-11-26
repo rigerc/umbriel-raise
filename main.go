@@ -16,6 +16,7 @@ import (
 )
 
 const usageText = `Usage: umbriel-raise --app-id APP_ID [--umbriel PATH] -- COMMAND [ARG...]
+       umbriel-raise cycle [OPTIONS]
        umbriel-raise setup [OPTIONS]
 
 Focus an existing Umbriel window, or launch the command when none exists.
@@ -23,6 +24,9 @@ Focus an existing Umbriel window, or launch the command when none exists.
 When several windows have the same app ID, repeated invocations rotate through
 Umbriel's focus history. Focusing also warps the cursor to the selected window.
 Matching is exact and case-sensitive.
+
+Use the cycle subcommand to rotate through the windows of whichever application
+already owns focus, without naming an app ID or a launch command.
 
 Options:
 `
@@ -165,15 +169,24 @@ func spawn(ctx context.Context, r runner, command []string) error {
 	return nil
 }
 
-func activate(ctx context.Context, r runner, appID string, command []string) error {
+// focusSelected focuses the window that pick chooses from a fresh window list,
+// falling back to missing when pick finds no candidate. The selected window may
+// close between the query and the focus action, so a failed focus refreshes the
+// list and resolves the choice once more before giving up.
+func focusSelected(
+	ctx context.Context,
+	r runner,
+	pick func([]window) (window, bool),
+	missing func() error,
+) error {
 	windows, err := listWindows(ctx, r)
 	if err != nil {
 		return err
 	}
 
-	selected, found := selectWindow(matchingWindows(windows, appID))
+	selected, found := pick(windows)
 	if !found {
-		return spawn(ctx, r, command)
+		return missing()
 	}
 
 	initialFocusErr := focusWindow(ctx, r, selected.ID)
@@ -181,16 +194,14 @@ func activate(ctx context.Context, r runner, appID string, command []string) err
 		return nil
 	}
 
-	// The selected window may have closed between the query and focus action.
-	// Refresh once before returning an error or deciding that a launch is needed.
 	windows, err = listWindows(ctx, r)
 	if err != nil {
 		return fmt.Errorf("refresh after focus failure (%v): %w", initialFocusErr, err)
 	}
 
-	selected, found = selectWindow(matchingWindows(windows, appID))
+	selected, found = pick(windows)
 	if !found {
-		return spawn(ctx, r, command)
+		return missing()
 	}
 
 	if err := focusWindow(ctx, r, selected.ID); err != nil {
@@ -198,6 +209,17 @@ func activate(ctx context.Context, r runner, appID string, command []string) err
 	}
 
 	return nil
+}
+
+func activate(ctx context.Context, r runner, appID string, command []string) error {
+	return focusSelected(
+		ctx,
+		r,
+		func(windows []window) (window, bool) {
+			return selectWindow(matchingWindows(windows, appID))
+		},
+		func() error { return spawn(ctx, r, command) },
+	)
 }
 
 func executeLegacy(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -232,8 +254,13 @@ func executeWithSetup(
 	stderr io.Writer,
 	setup setupExecutor,
 ) int {
-	if len(args) > 0 && args[0] == "setup" {
-		return setup(ctx, args[1:], stdin, stdout, stderr)
+	if len(args) > 0 {
+		switch args[0] {
+		case "setup":
+			return setup(ctx, args[1:], stdin, stdout, stderr)
+		case "cycle":
+			return runCycleCLI(ctx, args[1:], stdout, stderr)
+		}
 	}
 
 	return executeLegacy(ctx, args, stdout, stderr)
